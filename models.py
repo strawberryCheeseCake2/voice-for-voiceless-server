@@ -10,3 +10,11 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, index=True)
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True)
+    content = Column(String)
+    sender = Column(String)
+    sentTime = Column(String)
