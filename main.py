@@ -6,7 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import json
 
+from . import user
+
 app = FastAPI()
+app.include_router(user.router)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,20 +48,21 @@ async def get():
     return "Welcome Home"
 
 # 이름 중복 x, 4명 4번, GPT API, assistant api 사용
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: int):
+@app.websocket("/ws/{username}")
+# async def websocket_endpoint(websocket: WebSocket, client_id: int):
+async def websocket_endpoint(websocket: WebSocket, username: str):
     await manager.connect(websocket)
     now = datetime.now()
     current_time = now.strftime("%H:%M")
     try:
         while True:
             data = await websocket.receive_text()
-            # await manager.send_personal_message(f"You wrote: {data}", websocket)
-            message = {"time":current_time,"clientId":client_id,"message":data}
+            
+            message = {"sentTime":current_time,"username":username,"message":data}
             print(json.dumps(message))
             await manager.broadcast(json.dumps(message))
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        message = {"time":current_time,"clientId":client_id,"message":"Offline"}
-        await manager.broadcast(json.dumps(message))
+        # message = {"sentTime":current_time,"clientId":client_id,"message":"Offline"}
+        # await manager.broadcast(json.dumps(message))
