@@ -1,4 +1,4 @@
-#!/Users/kmg/Desktop/Code/web/voice-for-voiceless-server/fastapi/bin/python3
+#!/Users/kmg/Desktop/Code/web/voice-for-voiceless-server/fastapi/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

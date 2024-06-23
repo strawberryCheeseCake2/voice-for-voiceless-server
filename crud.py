@@ -17,7 +17,7 @@ def log_message(db: Session, message: schemas.MessageCreate):
         content=message.content,
         sender=message.sender,
         sentTime=message.sentTime
-        )
+      )
     db.add(db_message) # add sqlalchemy model instance object to your database session.
     db.commit() # save changes
     db.refresh(db_message) # so that it contains any new data from the database, like the generated ID

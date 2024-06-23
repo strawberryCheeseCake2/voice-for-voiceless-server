@@ -29,4 +29,5 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db_user:
         
         new_user = schemas.UserCreate(name=f"{user.name}{uuid.uuid1().int}")
-    return crud.create_user(db=db, user=new_user)
+        return crud.create_user(db=db, user=new_user) 
+    return crud.create_user(db=db, user=user)
