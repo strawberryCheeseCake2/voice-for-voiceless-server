@@ -54,8 +54,6 @@ def get_db():
     finally:
         db.close()
 
-# https://github.com/tiangolo/fastapi/discussions/9664
-
 
 @router.on_event("startup")
 async def startup_event():
@@ -89,22 +87,22 @@ async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = 
             await connection_manager.devil.add_user_message(message["message"])
             print(connection_manager.counter)
             print(len(connection_manager.active_connections))
-            if connection_manager.counter >= len(connection_manager.active_connections):
-                if connection_manager.devil:
-                    print("hit!")
-                    devil_message_content = await connection_manager.devil.run_devill()
-                    devil_message = {
-                        "sentTime": current_time, "username": "Annoymous Devil", "message": devil_message_content
-                    }
+            # if connection_manager.counter >= len(connection_manager.active_connections):
+            #     if connection_manager.devil:
+            #         print("hit!")
+            #         devil_message_content = await connection_manager.devil.run_devill()
+            #         devil_message = {
+            #             "sentTime": current_time, "username": "Annoymous Devil", "message": devil_message_content
+            #         }
 
-                    crud.log_message(db=db, message=schemas.MessageCreate(
-                        content=devil_message["message"],
-                        sender=devil_message["username"],
-                        sentTime=devil_message["sentTime"]
-                    ))
-                    print(devil_message)
-                    await connection_manager.broadcast(json.dumps(devil_message))
-                connection_manager.reset_counter()
+            #         crud.log_message(db=db, message=schemas.MessageCreate(
+            #             content=devil_message["message"],
+            #             sender=devil_message["username"],
+            #             sentTime=devil_message["sentTime"]
+            #         ))
+            #         print(devil_message)
+            #         await connection_manager.broadcast(json.dumps(devil_message))
+            #     connection_manager.reset_counter()
 
     except WebSocketDisconnect:
         connection_manager.disconnect(websocket)

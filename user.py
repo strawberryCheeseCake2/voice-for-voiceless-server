@@ -28,6 +28,17 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_name(db, name=user.name)
     if db_user:
         
-        new_user = schemas.UserCreate(name=f"{user.name}{uuid.uuid1().int}")
-        return crud.create_user(db=db, user=new_user) 
+        # new_user = schemas.UserCreate(name=f"{user.name}{uuid.uuid1().int}")
+        raise HTTPException(status_code=400, detail="Username was already taken")
+        # return crud.create_user(db=db, user=new_user) 
     return crud.create_user(db=db, user=user)
+
+@router.get("/users/{username}")
+def validate_user(username: str, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_name(db, name=username)
+
+    if db_user is None:
+        return False
+    
+    return True
+        
