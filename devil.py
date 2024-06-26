@@ -1,78 +1,74 @@
-from openai import OpenAI, AsyncOpenAI
-from openai.types.beta.threads.message import Message
-from openai.pagination import SyncCursorPage
-from typing import Optional, List
+from openai import AsyncOpenAI
+from typing import Optional, List, Callable
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
-from .secrets import openai_api_key
+from secrets import openai_api_key
 import asyncio
 
 
 class DevilManager:
-  def __init__(self):
-    self.__client = AsyncOpenAI(api_key=openai_api_key)
-    
-  
-  async def setup_devil(self):
-    print("start devil setup")
-    self.__assistant = await self.__client.beta.assistants.create(
-      name="Devil",
-      instructions="You are a devil's advocate. You have to express a contentious opinion with reasonable reason",
-      tools=[],
-      model="gpt-4o",
-    )
+    def __init__(self):
+        self.__client = AsyncOpenAI(api_key=openai_api_key)
+        self.history: List[ChatCompletionMessageParam] = []
+        self.session_chats: List[ChatCompletionMessageParam] = []
+        self.completion_buffer = ""
 
-    self.__thread = await self.__client.beta.threads.create()
-    print("Done Setup")
+    async def __get_stream(self, messages: List[ChatCompletionMessageParam]):
+        return await self.__client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            stream=True,
+        )
 
-  
-  async def run_devill(self):
-    print("before createpoll")
-    run = await self.__client.beta.threads.runs.create_and_poll(
-      thread_id=self.__thread.id,
-      assistant_id=self.__assistant.id,
-      instructions="You are a devil's advocate. You have to express a contentious opinion with reasonable reason"
-    )
+    async def get_streamed_content(self, streamHandler: Callable):
+        stream = self.__get_stream(self.session_chats)
+        async for chunk in stream:
+            chunk_content = chunk.choices[0].delta.content
+            if chunk_content is not None:
+                self.completion_buffer += chunk_content
+                streamHandler(self.completion_buffer)
 
-    if run.status == 'completed': 
-      messages: SyncCursorPage[Message] = await self.__client.beta.threads.messages.list(
-        thread_id=self.__thread.id
-      )
-      print(messages)
-      message = messages.data[0]
-      response = message.content[0].text.value
+    def clear_buffer(self):
+        self.completion_buffer = ""
 
-      return response
-    else:
-      return None
+    def add_session_chat(self, chat: ChatCompletionMessageParam):
+        self.session_chats += chat
+        return
+
+    def add_history(self, chat: ChatCompletionMessageParam):
+        self.history += chat
+        return
 
 
-  async def add_user_message(self, message: str):
-    print("start add message")
-    await self.__client.beta.threads.messages.create(
-      thread_id=self.__thread.id,
-      role="user",
-      # content="I think abortion should be legal. Making it illegal can infringe on the rights of pregnant women"
-      content=message
-    )
-    print("finish")
-    
+# client = AsyncOpenAI(api_key=openai_api_key)
 
-
-# manager = DevilManager()
 
 # async def test():
-#   manager.setup_devil()
-#   print("m1 before")
-#   await manager.add_user_message("I think abortion should be legal. Making it illegal can infringe on the rights of pregnant women")
-#   print("m1 after")
-#   print("m2 before")
-#   await manager.add_user_message("I agree with you. no one can hinder one's decision")
-#   print("m2 after")
-#   msgs = await manager.run_devill()
-#   print(msgs)
+#     stream = await client.chat.completions.create(
+#         model="gpt-4o",
+#         messages=[
+#             {"role": "system", "content": "너는 악마의 대변인이야. 근거를 들어서 여론에 반박해."},
+#             {"role": "user", "content": "User 1: 우리 회사는 비대면 근무를 도입해야 합니다. 비대면 근무를 하면 사원들이 출퇴근 시간을 절약할 수 있습니다."},
+#             {"role": "user", "content": "User 2: 동의합니다"}
+#         ],
+#         stream=True,
+#     )
+
+#     async for chunk in stream:
+#         chunk_content = chunk.choices[0].delta.content
+#         if chunk_content is not None:
+#             # 합쳐서 broadcast
+#             print(chunk_content, end="")
+
+async def test2():
+    devil = DevilManager()
+    devil.add_session_chat({"role": "system", "content": "너는 악마의 대변인이야. 근거를 들어서 여론에 반박해."})
+    devil.add_session_chat({"role": "user", "content": "윤이: 우리 회사는 비대면 근무를 도입해야 합니다. 비대면 근무를 하면 사원들이 출퇴근 시간을 절약할 수 있습니다."})
+    devil.add_session_chat({"role": "user", "content": "철수: 동의합니다."})
+    
+    devil.get_streamed_content()
+
+
+
 
 # asyncio.run(test())
-
-
-
-
