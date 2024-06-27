@@ -1,6 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from datetime import datetime
+from pytz import timezone
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -9,21 +10,13 @@ import json
 from .database import SessionLocal, engine
 
 from sqlalchemy.orm import Session
-from . import crud, schemas
+from . import crud, schemas, constants
 from .devil import DevilManager
 
 
 class ConnectionManager:
-    def __init__(self, devil: Optional[DevilManager] = None):
+    def __init__(self):
         self.active_connections: List[WebSocket] = []
-        self.devil = devil
-        self.counter = 0
-
-    def reset_counter(self):
-        self.counter = 0
-
-    def increase_counter(self):
-        self.counter += 1
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -41,7 +34,7 @@ class ConnectionManager:
 
 
 devil = DevilManager()
-connection_manager = ConnectionManager(devil)
+connection_manager = ConnectionManager()
 
 
 router = APIRouter()
@@ -55,54 +48,50 @@ def get_db():
         db.close()
 
 
-@router.on_event("startup")
-async def startup_event():
-    await devil.setup_devil()
-
-
 @router.websocket("/ws/{username}")
 async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = Depends(get_db)):
+
     await connection_manager.connect(websocket)
 
     try:
         while True:
             data = await websocket.receive_text()
 
-            now = datetime.now()
-            current_time = now.strftime("%Y-%m-%d %H:%M:%S")
-            message = {"sentTime": current_time,
-                       "username": username, "message": data}
+            current_time = datetime.now(timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M:%S")
+            message = schemas.WSMessageCreate(
+                sentTime=current_time,
+                sender=username,
+                content=data
+            )
+            crud.log_message(db=db, message=message)
 
-            crud.log_message(db=db, message=schemas.MessageCreate(
-                content=message["message"],
-                sender=message["username"],
-                sentTime=message["sentTime"]
-            ))
+            await connection_manager.broadcast(message.model_dump_json())
 
-            connection_manager.increase_counter()
+            devil.add_user_message(message.content)
+            if devil.get_counter() >= len(connection_manager.active_connections):
 
-            print(json.dumps(message))
-            await connection_manager.broadcast(json.dumps(message))
+                async def handle_stream(streamed_content: str, isFirstToken: bool = False):
+                    devil_message = schemas.WSMessageCreate(
+                        content=streamed_content,
+                        sender=constants.devil_name,
+                        sentTime=current_time,
+                        isStream=True,
+                        isFirstToken=isFirstToken
+                    )
+                    await connection_manager.broadcast(devil_message.model_dump_json())
+                    
+                def handle_stream_complete(completion: str):
+                    completed_message = schemas.WSMessageCreate(
+                        content=completion,
+                        sender=constants.devil_name,
+                        sentTime=current_time,
+                    )
+                    crud.log_message(db=db, message=completed_message)
 
-            connection_manager.devil.add_user_message(message["message"])
-            print(connection_manager.counter)
-            print(len(connection_manager.active_connections))
-            # if connection_manager.counter >= len(connection_manager.active_connections):
-            #     if connection_manager.devil:
-            #         print("hit!")
-            #         devil_message_content = await connection_manager.devil.run_devill()
-            #         devil_message = {
-            #             "sentTime": current_time, "username": "Annoymous Devil", "message": devil_message_content
-            #         }
+                await devil.get_streamed_content(streamHandler=handle_stream, 
+                                                 completionHandler=handle_stream_complete)
 
-            #         crud.log_message(db=db, message=schemas.MessageCreate(
-            #             content=devil_message["message"],
-            #             sender=devil_message["username"],
-            #             sentTime=devil_message["sentTime"]
-            #         ))
-            #         print(devil_message)
-            #         await connection_manager.broadcast(json.dumps(devil_message))
-            #     connection_manager.reset_counter()
+                devil.reset_counter()
 
     except WebSocketDisconnect:
         connection_manager.disconnect(websocket)

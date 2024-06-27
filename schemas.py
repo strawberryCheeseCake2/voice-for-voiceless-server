@@ -13,7 +13,7 @@ class User(UserBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class MessageBase(BaseModel):
     content: str
@@ -28,3 +28,6 @@ class MessageCreate(BaseModel):
 class Message(MessageBase):
     id: int
     
+class WSMessageCreate(MessageCreate):
+    isStream: bool = False
+    isFirstToken: bool = False
