@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/home/user/Code/voice-for-voiceless-server/fastapi"
+set -gx VIRTUAL_ENV "/Users/kmg/Desktop/Code/web/voice-for-voiceless-server/fastapi"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH

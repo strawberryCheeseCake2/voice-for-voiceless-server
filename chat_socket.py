@@ -84,7 +84,7 @@ async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = 
             print(json.dumps(message))
             await connection_manager.broadcast(json.dumps(message))
 
-            await connection_manager.devil.add_user_message(message["message"])
+            connection_manager.devil.add_user_message(message["message"])
             print(connection_manager.counter)
             print(len(connection_manager.active_connections))
             # if connection_manager.counter >= len(connection_manager.active_connections):
