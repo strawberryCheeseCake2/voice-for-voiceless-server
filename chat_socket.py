@@ -12,7 +12,7 @@ from .database import SessionLocal, engine
 from sqlalchemy.orm import Session
 from . import crud, schemas, constants
 from .devil import DevilManager
-
+from .rag_devil import RagDevil
 
 class ConnectionManager:
     def __init__(self):
@@ -33,7 +33,8 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
-devil = DevilManager()
+# devil = DevilManager()
+devil = RagDevil()
 connection_manager = ConnectionManager()
 
 
@@ -67,7 +68,7 @@ async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = 
 
             await connection_manager.broadcast(message.model_dump_json())
 
-            devil.add_user_message(message.content)
+            devil.add_user_message(sender=message.sender ,message=message.content)
             if devil.get_counter() >= len(connection_manager.active_connections):
 
                 async def handle_stream(streamed_content: str, isFirstToken: bool = False):

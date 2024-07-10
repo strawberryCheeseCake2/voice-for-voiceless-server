@@ -1,5 +1,6 @@
 # pydantic models
 from pydantic import BaseModel
+from typing import Optional
 
 class UserBase(BaseModel):
     name: str
@@ -23,7 +24,7 @@ class MessageBase(BaseModel):
 class MessageCreate(BaseModel):
     content: str
     sender: str
-    sentTime: str
+    sentTime: Optional[str] = None
 
 class Message(MessageBase):
     id: int

@@ -18,3 +18,14 @@ class Message(Base):
     content = Column(String)
     sender = Column(String)
     sentTime = Column(String)
+
+class SecretDm(Base):
+    __tablename__ = "secretDms"
+
+    id = Column(Integer, primary_key=True)
+
+    content = Column(String)
+    sender = Column(String)
+    sentTime = Column(String)
+    isUsed = Column(Boolean)
+    

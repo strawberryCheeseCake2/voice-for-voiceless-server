@@ -1,12 +1,13 @@
 from openai import AsyncOpenAI
-from typing import Optional, List, Callable
+from typing import Optional, List, Callable, override
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 from .secrets import openai_api_key
+from .devil_base import DevilBase
 import asyncio
 
 
-class DevilManager:
+class DevilManager(DevilBase):
     def __init__(self):
         self.__client = AsyncOpenAI(api_key=openai_api_key)
         self.history: List[ChatCompletionMessageParam] = [
@@ -14,6 +15,7 @@ class DevilManager:
         ]
         self.__counter = 0
 
+    @override
     async def __get_stream(self, messages: List[ChatCompletionMessageParam]):
         print(messages)
         stream = await self.__client.chat.completions.create(
@@ -23,7 +25,8 @@ class DevilManager:
         )
 
         return stream
-
+    
+    @override
     async def get_streamed_content(self, streamHandler: Callable[[str, bool], None],
                                     completionHandler: Callable[[str], None]):
         stream = await self.__get_stream(self.history)
@@ -44,23 +47,24 @@ class DevilManager:
         self.__add_history({"role": "assistant", "content": completion_buffer})
         completionHandler(completion_buffer)
 
-    def clear_buffer(self):
-        self.completion_buffer = ""
-
+    @override
     def __add_history(self, chat: ChatCompletionMessageParam):
         self.history.append(chat)
     
-    def add_user_message(self, message: str):
-        self.__add_history({"role": "user", "content": message})
+    @override
+    def add_user_message(self, sender: str ,message: str):
+        self.__add_history({"role": "user", "content": f"{sender}: {message}"})
         self.increase_counter()
-        # TODO: put username in the content
 
+    @override  
     def get_counter(self):
         return self.__counter
-
+    
+    @override
     def reset_counter(self):
         self.__counter = 0
 
+    @override
     def increase_counter(self):
         self.__counter += 1
 
