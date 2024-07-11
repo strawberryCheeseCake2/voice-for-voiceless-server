@@ -31,7 +31,7 @@ I think Development of the AI should be regulated. AI is taking away jobs and pe
 I agree
 
 
-I cant't agree with these guys. Rather than taking away, AI creates jobs!
+I can't agree with these guys. Rather than taking away, AI creates jobs!
 """
 
 
@@ -71,7 +71,7 @@ class RagDevil(DevilBase):
       docs, ids = self.__get_opposing_opinions()
       self.__mark_as_used(ids=ids)
 
-
+      print(docs)
       text_splitter = RecursiveCharacterTextSplitter(
           chunk_size=1000, chunk_overlap=200)
       splits = text_splitter.split_documents(docs)
