@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 import json
 
-from .database import SessionLocal, engine
+from .database import SessionLocal, engine, get_db
 
 from sqlalchemy.orm import Session
 from . import crud, schemas, constants
@@ -41,12 +41,12 @@ connection_manager = ConnectionManager()
 router = APIRouter()
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# def get_db():
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 
 @router.websocket("/ws/{username}")
@@ -71,26 +71,21 @@ async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = 
             devil.add_user_message(sender=message.sender ,message=message.content)
             if devil.get_counter() >= len(connection_manager.active_connections):
 
-                async def handle_stream(streamed_content: str, isFirstToken: bool = False):
-                    devil_message = schemas.WSMessageCreate(
-                        content=streamed_content,
-                        sender=constants.devil_name,
-                        sentTime=current_time,
-                        isStream=True,
-                        isFirstToken=isFirstToken
-                    )
-                    await connection_manager.broadcast(devil_message.model_dump_json())
-                    
-                def handle_stream_complete(completion: str):
-                    completed_message = schemas.WSMessageCreate(
-                        content=completion,
-                        sender=constants.devil_name,
-                        sentTime=current_time,
-                    )
-                    crud.log_message(db=db, message=completed_message)
+                dms = crud.get_unused_secret_dms(db=next(get_db()))
+                opinions = "[Anonoymous Comments]\n"
 
-                await devil.get_streamed_content(streamHandler=handle_stream, 
-                                                 completionHandler=handle_stream_complete)
+                for dm in dms:
+                    opinions += dm.content + "\n"
+                
+                db_message = schemas.WSMessageCreate(
+                    content=opinions,
+                    sender=constants.devil_name,
+                    sentTime=current_time
+                )
+
+                await connection_manager.broadcast(db_message.model_dump_json())
+
+                crud.log_message(db=db, message=db_message)
 
                 devil.reset_counter()
 
