@@ -33,8 +33,8 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
-devil = DevilManager()
-# devil = RagDevil()
+# devil = DevilManager()
+devil = RagDevil()
 connection_manager = ConnectionManager()
 
 

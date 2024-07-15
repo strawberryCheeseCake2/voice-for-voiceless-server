@@ -50,7 +50,7 @@ class RagDevil(DevilBase):
 
     def __get_opposing_opinions(self):
         dms = crud.get_unused_secret_dms(db=next(get_db()))
-        opinions = ""
+        opinions = "opinions:\n"
         ids = []
 
         for dm in dms:
