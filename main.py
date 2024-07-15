@@ -10,6 +10,7 @@ from .database import SessionLocal, engine
 from . import chat_socket, models, secretDm
 
 
+# lt --port 8000 --subdomain voiceforvoiceless
 
 app = FastAPI()
 app.include_router(user.router)

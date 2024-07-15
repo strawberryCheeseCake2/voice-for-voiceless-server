@@ -72,7 +72,7 @@ async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = 
             if devil.get_counter() >= len(connection_manager.active_connections):
 
                 dms = crud.get_unused_secret_dms(db=next(get_db()))
-                opinions = "[Anonoymous Comments]\n"
+                opinions = f"[{constants.anonymous_comment}]"
 
                 for dm in dms:
                     opinions += dm.content + "\n"
