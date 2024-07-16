@@ -5,9 +5,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 
-from . import user
-from .database import SessionLocal, engine
-from . import chat_socket, models, secretDm
+import user
+from database import SessionLocal, engine
+import chat_socket, models, secretDm
 
 
 

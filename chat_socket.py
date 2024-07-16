@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager
 
 import json
 
-from .database import SessionLocal, engine
+from database import SessionLocal, engine
 
 from sqlalchemy.orm import Session
-from . import crud, schemas, constants
-from .devil import DevilManager
-from .rag_devil import RagDevil
+import crud, schemas, constants
+# from devil import DevilManager
+from rag_devil import RagDevil
 
 class ConnectionManager:
     def __init__(self):

@@ -20,10 +20,15 @@ from langchain_core.messages.system import SystemMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.ai import AIMessage
 
-from .database import get_db
-from .secrets import openai_api_key
-from .devil_base import DevilBase
-from . import crud
+from database import get_db
+# from secret import openai_api_key
+from devil_base import DevilBase
+import crud
+
+from os import environ as env
+
+openai_api_key = env['API_KEY']
+print(openai_api_key)
 
 """
 I think Development of the AI should be regulated. AI is taking away jobs and people are getting fired

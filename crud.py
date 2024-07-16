@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import List
 
-from . import models, schemas
+import models, schemas
 
 def get_user_by_name(db: Session, name: str):
     return db.query(models.User).filter(models.User.name == name).first()

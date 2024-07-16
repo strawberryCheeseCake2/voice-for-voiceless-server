@@ -6,8 +6,8 @@ from pytz import timezone
 
 from sqlalchemy.orm import Session
 
-from . import crud, models, schemas
-from .database import get_db
+import crud, models, schemas
+from database import get_db
 
 import uuid
 
