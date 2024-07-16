@@ -22,13 +22,15 @@ from langchain_core.messages.ai import AIMessage
 
 from database import get_db
 # from secret import openai_api_key
+import dotenv
 from devil_base import DevilBase
 import crud
 
 from os import environ as env
 
-openai_api_key = env['API_KEY']
-print(openai_api_key)
+dotenv.load_dotenv()
+openai_api_key = env['openai_api_key']
+
 
 """
 I think Development of the AI should be regulated. AI is taking away jobs and people are getting fired

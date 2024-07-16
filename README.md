@@ -7,5 +7,6 @@ source ./fastapi/bin/activate
 
 Run FastAPI Server
 ```
-fastapi dev main.py
+<!-- fastapi dev main.py -->
+uvicorn main:app --reload
 ```
