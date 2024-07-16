@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    command: sh -c "uvicorn main:app --reload --port=8000 --host=0.0.0.0"
+    env_file:
+      - .env
+    ports:
+      - 8000:8000
+    volumes:
+      - .:/app
+
+# Build
+# sudo docker compose up --build
+
+# Rebuild
+# sudo docker compose up
+
+# docker tag local-image:latest new-repo:tagname
+# docker push new-repo:tagname
+
+
+# docker bulid -t strawberrycheesecake2/vfv-conda:1.0.0
+
+# Google Cloud run
+# Select image
+# set port 8000, region, memory, env
+
+
+# Update build
+# docker bulid -t strawberrycheesecake2/vfv-conda:1.0.1 .
+# docker push strawberrycheesecake2/vfv-conda:1.0.1

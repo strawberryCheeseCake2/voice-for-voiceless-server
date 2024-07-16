@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager
 
 import json
 
-from .database import SessionLocal, engine, get_db
+from database import SessionLocal, engine, get_db
 
 from sqlalchemy.orm import Session
-from . import crud, schemas, constants
-from .devil import DevilManager
-from .rag_devil import RagDevil
+import crud, schemas, constants
+# from devil import DevilManager
+from rag_devil import RagDevil
 
 class ConnectionManager:
     def __init__(self):
@@ -33,8 +33,8 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
-devil = DevilManager()
-# devil = RagDevil()
+# devil = DevilManager()
+devil = RagDevil()
 connection_manager = ConnectionManager()
 
 
@@ -72,10 +72,13 @@ async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = 
             if devil.get_counter() >= len(connection_manager.active_connections):
 
                 dms = crud.get_unused_secret_dms(db=next(get_db()))
-                opinions = f"[{constants.anonymous_comment}]"
+                opinions = f"[{constants.anonymous_comment}]\n"
 
-                for dm in dms:
-                    opinions += dm.content + "\n"
+                if len(dms) <= 0:
+                    opinions += "There's no DM"
+                else:
+                    for dm in dms:
+                        opinions += dm.content + "\n"
                 
                 db_message = schemas.WSMessageCreate(
                     content=opinions,

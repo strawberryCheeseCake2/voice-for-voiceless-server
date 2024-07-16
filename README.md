@@ -5,7 +5,12 @@ Activate Virtual Environment
 source ./fastapi/bin/activate
 ```
 
+Install required packages
+```
+pip install -r requirements.txt
+```
+
 Run FastAPI Server
 ```
-fastapi dev main.py
+uvicorn main:app --reload
 ```

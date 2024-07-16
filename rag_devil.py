@@ -20,10 +20,17 @@ from langchain_core.messages.system import SystemMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.ai import AIMessage
 
-from .database import get_db
-from .secrets import openai_api_key
-from .devil_base import DevilBase
-from . import crud
+from database import get_db
+# from secret import openai_api_key
+import dotenv
+from devil_base import DevilBase
+import crud
+
+from os import environ as env
+
+dotenv.load_dotenv()
+openai_api_key = env['openai_api_key']
+
 
 """
 I think Development of the AI should be regulated. AI is taking away jobs and people are getting fired
@@ -50,7 +57,7 @@ class RagDevil(DevilBase):
 
     def __get_opposing_opinions(self):
         dms = crud.get_unused_secret_dms(db=next(get_db()))
-        opinions = ""
+        opinions = "opinions:\n"
         ids = []
 
         for dm in dms:
