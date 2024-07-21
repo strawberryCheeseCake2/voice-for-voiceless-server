@@ -160,7 +160,3 @@ class RagDevil(DevilBase):
     @override
     def reset_history(self):
         self.history = []
-
-
-# devil = DevilManager()
-devil = RagDevil()
