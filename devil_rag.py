@@ -152,3 +152,15 @@ class RagDevil(DevilBase):
     @override
     def increase_counter(self):
         self.__counter += 1
+
+    @override
+    def get_history(self):
+        return self.history
+    
+    @override
+    def reset_history(self):
+        self.history = []
+
+
+# devil = DevilManager()
+devil = RagDevil()
