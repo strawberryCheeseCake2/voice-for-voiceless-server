@@ -25,6 +25,7 @@ from database import get_db
 import dotenv
 from devil_base import DevilBase
 import crud
+from constants import critique_system_message
 
 from os import environ as env
 
@@ -44,25 +45,39 @@ I can't agree with these guys. Rather than taking away, AI creates jobs!
 
 class RagDevil(DevilBase):
     def __init__(self):
-        self.__client = ChatOpenAI(api_key=openai_api_key)
-        self.history: Sequence[MessageLikeRepresentation] = [
-            SystemMessage(content="""You are the devil's advocate.
-             You listen to the stories of people (from documents)
-             who oppose public opinion but are unable to express their dissent
-             due to social awareness, and based on this, you present arguments against the public opinion.
-             Respond in 2-3 sentences
-         """)
-        ]
+        self.__client = ChatOpenAI(
+            api_key=openai_api_key,
+            model="gpt-4o",
+            temperature=0.7,
+            max_tokens=256
+            )
+        self.history: Sequence[MessageLikeRepresentation] = []
         self.__counter = 0
 
+    def create_message_param(self):
+        chat_history_string = "[대화 내역]\n"
+
+        for msg in self.history:
+            chat_history_string += msg.content + "\n"
+
+        _messages = [
+            SystemMessage(content=critique_system_message),
+            HumanMessage(content=chat_history_string)
+        ]
+
+        return _messages
+
     def __get_opposing_opinions(self):
-        dms = crud.get_unused_secret_dms(db=next(get_db()))
-        opinions = "opinions:\n"
+        dms = crud.get_all_secret_dms(db=next(get_db()))
+        opinions = "[Comment Box]\n"
         ids = []
 
         for dm in dms:
             opinions += dm.content + "\n"
             ids.append(dm.id)
+
+        if len(dms) <= 0:
+            opinions += "Empty"
 
         opinion_docs = [Document(page_content=opinions)]
 
@@ -72,47 +87,47 @@ class RagDevil(DevilBase):
         crud.mark_dm_as_used(db=next(get_db()), ids=ids)
 
     async def __get_rag_chain(self):
-    
-      prompt = ChatPromptTemplate.from_messages(self.history + [SystemMessage(content="{question}\n{context}")])
 
-      docs, ids = self.__get_opposing_opinions()
-      self.__mark_as_used(ids=ids)
+        _messages = [HumanMessage(content="{question}{context}")] + self.create_message_param()
+        print(_messages)
+        prompt = ChatPromptTemplate.from_messages(_messages)
 
-      print(docs)
-      text_splitter = RecursiveCharacterTextSplitter(
-          chunk_size=1000, chunk_overlap=200)
-      splits = text_splitter.split_documents(docs)
-      vectorstore = await Chroma.afrom_documents(
-          documents=splits, embedding=OpenAIEmbeddings(openai_api_key=openai_api_key))
+        docs, ids = self.__get_opposing_opinions()
+        self.__mark_as_used(ids=ids)
 
-      # Retrieve and generate using the relevant snippets of the blog.
-      retriever = vectorstore.as_retriever()
+        print(docs)
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000, chunk_overlap=200)
+        splits = text_splitter.split_documents(docs)
+        vectorstore = await Chroma.afrom_documents(
+            documents=splits, embedding=OpenAIEmbeddings(openai_api_key=openai_api_key))
 
-      def format_docs(docs):
-        return "\n\n".join(doc.page_content for doc in docs)
+        # Retrieve and generate using the relevant snippets of the blog.
+        retriever = vectorstore.as_retriever()
 
+        def format_docs(docs):
+            return "\n\n".join(doc.page_content for doc in docs)
 
-      rag_chain: RunnableSerializable = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | self.__client
-        | StrOutputParser()
-      )
-      
-      return rag_chain
+        rag_chain: RunnableSerializable = (
+            {"context": retriever | format_docs, "question": RunnablePassthrough()}
+            | prompt
+            | self.__client
+            | StrOutputParser()
+        )
+
+        return rag_chain
 
     @override
-    async def __get_stream(self, messages: Sequence[MessageLikeRepresentation]):
-        print(messages)
+    async def __get_stream(self):
         rag_chain = await self.__get_rag_chain()
-        stream = rag_chain.astream("Express opinion against the public opinion")
+        stream = rag_chain.astream("")
 
         return stream
 
     @override
     async def get_streamed_content(self, streamHandler: Callable[[str, bool], None],
                                    completionHandler: Callable[[str], None]):
-        stream = await self.__get_stream(self.history)
+        stream = await self.__get_stream()
         completion_buffer = ""
 
         isFirstChunk = True
@@ -126,7 +141,7 @@ class RagDevil(DevilBase):
 
                 if isFirstChunk:
                     isFirstChunk = False
-        
+
         self.__add_history(AIMessage(content=completion_buffer))
         completionHandler(completion_buffer)
 
@@ -153,10 +168,11 @@ class RagDevil(DevilBase):
     def increase_counter(self):
         self.__counter += 1
 
+    # For admin
     @override
     def get_history(self):
         return self.history
-    
+
     @override
     def reset_history(self):
         self.history = []

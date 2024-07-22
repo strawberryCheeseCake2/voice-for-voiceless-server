@@ -42,6 +42,9 @@ def log_secretDm(db: Session, message: schemas.MessageCreate):
 def get_unused_secret_dms(db: Session):
     return db.query(models.SecretDm).filter(models.SecretDm.isUsed == False).all()
 
+def get_all_secret_dms(db: Session):
+    return db.query(models.SecretDm).all()
+
 def mark_dm_as_used(db: Session, ids: List[int]):
     unused = db.query(models.SecretDm).filter(models.SecretDm.id.in_(ids)).all()
     
