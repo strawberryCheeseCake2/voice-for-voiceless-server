@@ -42,3 +42,15 @@ def reset_devil_history(for_real: bool, devil: RagDevil = Depends(get_devil)):
     if for_real:
         devil.reset_history()
     return devil.get_history()
+
+@router.get("/admin/inspect-secret-dms/")
+def show_secret_dms(db: Session = Depends(get_db)):
+    
+    dms = crud.get_all_secret_dms(db=db)
+    return dms
+
+@router.post("/admin/reset-secret-dms/")
+def reset_devil_history(for_real: bool, db: Session = Depends(get_db)):
+    if for_real:
+        crud.reset_secret_dms(db=db)
+    return crud.get_all_secret_dms(db=db)
