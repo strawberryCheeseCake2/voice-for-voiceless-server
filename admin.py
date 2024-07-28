@@ -50,7 +50,7 @@ def show_secret_dms(db: Session = Depends(get_db)):
     return dms
 
 @router.post("/admin/reset-secret-dms/")
-def reset_devil_history(for_real: bool, db: Session = Depends(get_db)):
+def mark_all_dms_as_used(for_real: bool, db: Session = Depends(get_db)):
     if for_real:
-        crud.reset_secret_dms(db=db)
+        crud.mark_all_dms_as_used(db=db)
     return crud.get_all_secret_dms(db=db)

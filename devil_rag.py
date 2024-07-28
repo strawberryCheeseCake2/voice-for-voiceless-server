@@ -28,6 +28,8 @@ import crud
 from constants import critique_system_message
 
 from os import environ as env
+# from models import SecretDm
+import schemas
 
 dotenv.load_dotenv()
 openai_api_key = env['openai_api_key']
@@ -52,7 +54,9 @@ class RagDevil(DevilBase):
             max_tokens=256
             )
         self.history: Sequence[MessageLikeRepresentation] = []
+        self.__secret_dms: List[schemas.SecretDmCreate] = []
         self.__counter = 0
+        
 
     def create_message_param(self):
         chat_history_string = "[대화 내역]\n"
@@ -62,13 +66,20 @@ class RagDevil(DevilBase):
 
         _messages = [
             SystemMessage(content=critique_system_message),
+            HumanMessage(content="{context}"),
             HumanMessage(content=chat_history_string)
         ]
 
         return _messages
 
     def __get_opposing_opinions(self):
-        dms = crud.get_all_secret_dms(db=next(get_db()))
+        """
+        For Condition B, C, used Field aims to remove dms used in first round experiment
+        For Condition A, it aims to avoid same secret dm appear again
+        """
+        dms = crud.get_unused_secret_dms(db=next(get_db()))
+        # dms = crud.get_all_secret_dms(db=next(get_db()))
+
         opinions = "[Comment Box]\n"
         ids = []
 
@@ -88,12 +99,12 @@ class RagDevil(DevilBase):
 
     async def __get_rag_chain(self):
 
-        _messages = [HumanMessage(content="{question}{context}")] + self.create_message_param()
+        _messages = self.create_message_param()
         print(_messages)
         prompt = ChatPromptTemplate.from_messages(_messages)
 
         docs, ids = self.__get_opposing_opinions()
-        self.__mark_as_used(ids=ids)
+        # self.__mark_as_used(ids=ids) # For Condition A
 
         print(docs)
         text_splitter = RecursiveCharacterTextSplitter(
@@ -109,7 +120,7 @@ class RagDevil(DevilBase):
             return "\n\n".join(doc.page_content for doc in docs)
 
         rag_chain: RunnableSerializable = (
-            {"context": retriever | format_docs, "question": RunnablePassthrough()}
+            {"context": retriever | format_docs}
             | prompt
             | self.__client
             | StrOutputParser()
@@ -117,6 +128,8 @@ class RagDevil(DevilBase):
 
         return rag_chain
 
+
+    ## Stream
     @override
     async def __get_stream(self):
         rag_chain = await self.__get_rag_chain()
