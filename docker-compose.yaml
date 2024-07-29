@@ -10,3 +10,6 @@ services:
       - 8000:8000
     volumes:
       - .:/app
+
+# sudo docker compose up --build
+# sudo docker compose up 
