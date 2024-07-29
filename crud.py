@@ -45,6 +45,24 @@ def get_unused_secret_dms(db: Session):
 def get_all_secret_dms(db: Session):
     return db.query(models.SecretDm).all()
 
+def reset_secret_dms(db: Session):
+    db.query(models.SecretDm).delete()
+    db.commit()
+    return 
+
+def mark_all_dms_as_used(db: Session):
+    unused = db.query(models.SecretDm).all()
+    
+    if not unused:
+        print("There's no dm")
+    
+    for unused_dm in unused:
+        unused_dm.isUsed = True
+
+    db.commit()
+
+    return
+
 def mark_dm_as_used(db: Session, ids: List[int]):
     unused = db.query(models.SecretDm).filter(models.SecretDm.id.in_(ids)).all()
     

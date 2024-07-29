@@ -3,3 +3,9 @@ secret.py
 /fastapi
 stream_devil.py
 .env
+fastapi
+fastapi/
+__pychache__/
+/__pychache__
+__pychache__
+

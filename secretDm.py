@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 import crud, models, schemas
 from database import get_db
+from devil_rag import RagDevil
+from devil import get_devil
 
 import uuid
 

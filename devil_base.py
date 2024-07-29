@@ -7,12 +7,6 @@ from langchain_core.prompts.chat import MessageLikeRepresentation
 
 class DevilBase(metaclass=ABCMeta):
 
-  # @abstractmethod
-  # async def __get_stream(self, messages: Union[
-  #    List[ChatCompletionMessageParam], Sequence[MessageLikeRepresentation]
-  #    ]):
-  #   pass
-
   @abstractmethod
   async def get_streamed_content(self, streamHandler: Callable, completionHandler: Callable):
         pass
@@ -32,3 +26,12 @@ class DevilBase(metaclass=ABCMeta):
   @abstractmethod
   def increase_counter(self):
     pass
+  
+  @abstractmethod
+  def get_history(self):
+        pass
+  
+  @abstractmethod
+  def reset_history(self):
+    pass
+

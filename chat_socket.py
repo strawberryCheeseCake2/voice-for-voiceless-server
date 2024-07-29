@@ -10,9 +10,13 @@ import json
 from database import SessionLocal, engine, get_db
 
 from sqlalchemy.orm import Session
-import crud, schemas, constants
+import crud
+import schemas
+import constants
 # from devil import DevilManager
-from rag_devil import RagDevil
+from devil_rag import RagDevil
+from devil import get_devil
+
 
 class ConnectionManager:
     def __init__(self):
@@ -33,14 +37,13 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
-# devil = DevilManager()
-devil = RagDevil()
 connection_manager = ConnectionManager()
 
 
 router = APIRouter()
 
 
+<<<<<<< HEAD
 # def get_db():
 #     db = SessionLocal()
 #     try:
@@ -49,8 +52,15 @@ router = APIRouter()
 #         db.close()
 
 
+=======
+>>>>>>> main
 @router.websocket("/ws/{username}")
-async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = Depends(get_db)):
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    username: str, 
+    db: Session = Depends(get_db), 
+    devil: RagDevil = Depends(get_devil)
+    ):
 
     await connection_manager.connect(websocket)
 
@@ -58,7 +68,8 @@ async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = 
         while True:
             data = await websocket.receive_text()
 
-            current_time = datetime.now(timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M:%S")
+            current_time = datetime.now(
+                timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M:%S")
             message = schemas.WSMessageCreate(
                 sentTime=current_time,
                 sender=username,
@@ -68,8 +79,9 @@ async def websocket_endpoint(websocket: WebSocket, username: str, db: Session = 
 
             await connection_manager.broadcast(message.model_dump_json())
 
-            devil.add_user_message(sender=message.sender ,message=message.content)
-            if devil.get_counter() >= len(connection_manager.active_connections):
+            devil.add_user_message(sender=message.sender,
+                                   message=message.content)
+            if devil.get_counter() >= 2 * len(connection_manager.active_connections):
 
                 dms = crud.get_unused_secret_dms(db=next(get_db()))
                 opinions = f"[{constants.anonymous_comment}]\n"
