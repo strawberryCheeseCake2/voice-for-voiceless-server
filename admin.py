@@ -43,6 +43,11 @@ def reset_devil_history(for_real: bool, devil: RagDevil = Depends(get_devil)):
         devil.reset_history()
     return devil.get_history()
 
+@router.post("/admin/set-system-prompt/")
+def reset_devil_history(prompt: str, devil: RagDevil = Depends(get_devil)):
+    devil.set_system_prompt(content=prompt)
+    return devil.get_system_prompt()
+
 @router.get("/admin/inspect-secret-dms/")
 def show_secret_dms(db: Session = Depends(get_db)):
     

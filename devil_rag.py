@@ -54,7 +54,7 @@ class RagDevil(DevilBase):
             max_tokens=256
             )
         self.history: Sequence[MessageLikeRepresentation] = []
-        self.__secret_dms: List[schemas.SecretDmCreate] = []
+        self.__system_prompt = critique_system_message
         self.__counter = 0
         
 
@@ -65,7 +65,7 @@ class RagDevil(DevilBase):
             chat_history_string += msg.content + "\n"
 
         _messages = [
-            SystemMessage(content=critique_system_message),
+            SystemMessage(content=self.__system_prompt),
             HumanMessage(content="{context}"),
             HumanMessage(content=chat_history_string)
         ]
@@ -189,3 +189,10 @@ class RagDevil(DevilBase):
     @override
     def reset_history(self):
         self.history = []
+        self.reset_counter()
+
+    def set_system_prompt(self, content: str):
+        self.__system_prompt = content
+
+    def get_system_prompt(self):
+        return self.__system_prompt

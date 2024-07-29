@@ -15,8 +15,8 @@
 # some setting in azure 
 # docker login with created login server(created on registry creation)
 
-# docker build -t {SERVER_NAME}.azurecr.io/{CONTAINER_NAME}:build-tag-1 .
-# docker push {SERVER_NAME}.azurecr.io/{CONTAINER_NAME}:build-tag-1
+# docker build -t strawberrycheesecake2/vfv-condc:build-tag-1 .
+# docker push strawberrycheesecake2/vfv-condc:build-tag-1
 
 
 
