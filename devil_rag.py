@@ -56,6 +56,7 @@ class RagDevil(DevilBase):
         self.history: Sequence[MessageLikeRepresentation] = []
         self.__system_prompt = critique_system_message
         self.__counter = 0
+        self.enabled = True
         
 
     def create_message_param(self):
@@ -196,3 +197,11 @@ class RagDevil(DevilBase):
 
     def get_system_prompt(self):
         return self.__system_prompt
+
+    def enable(self, enabled: bool):
+        self.enabled = enabled
+        if enabled:
+            self.reset_counter()
+
+    def is_enabled(self):
+        return self.enabled

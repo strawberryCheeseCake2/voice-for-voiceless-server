@@ -70,7 +70,7 @@ async def websocket_endpoint(
 
             devil.add_user_message(sender=message.sender,
                                    message=message.content)
-            if devil.get_counter() >= 2 * len(connection_manager.active_connections):
+            if devil.is_enabled() and (devil.get_counter() >= 2 * len(connection_manager.active_connections)):
 
                 async def handle_stream(streamed_content: str, isFirstToken: bool = False):
                     devil_message = schemas.WSMessageCreate(
