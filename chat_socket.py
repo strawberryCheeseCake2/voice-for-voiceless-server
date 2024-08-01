@@ -43,17 +43,6 @@ connection_manager = ConnectionManager()
 router = APIRouter()
 
 
-<<<<<<< HEAD
-# def get_db():
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
-
-
-=======
->>>>>>> main
 @router.websocket("/ws/{username}")
 async def websocket_endpoint(
     websocket: WebSocket, 
@@ -81,7 +70,7 @@ async def websocket_endpoint(
 
             devil.add_user_message(sender=message.sender,
                                    message=message.content)
-            if devil.get_counter() >= 2 * len(connection_manager.active_connections):
+            if devil.is_enabled() and (devil.get_counter() >= 2 * len(connection_manager.active_connections)):
 
                 dms = crud.get_unused_secret_dms(db=next(get_db()))
                 opinions = f"[{constants.anonymous_comment}]\n"

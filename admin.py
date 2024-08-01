@@ -59,3 +59,9 @@ def mark_all_dms_as_used(for_real: bool, db: Session = Depends(get_db)):
     if for_real:
         crud.mark_all_dms_as_used(db=db)
     return crud.get_all_secret_dms(db=db)
+
+@router.post("/admin/enable-devil/")
+def enable_devil(enable: bool, devil: RagDevil = Depends(get_devil)):
+    devil.enable(enabled=enable)
+    return devil.is_enabled()
+
