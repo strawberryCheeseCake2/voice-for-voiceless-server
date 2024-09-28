@@ -20,12 +20,14 @@ from langchain_core.messages.system import SystemMessage
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.ai import AIMessage
 
+from sentence_transformers import SentenceTransformer, util
+
 from database import get_db
 # from secret import openai_api_key
 import dotenv
 from devil_base import DevilBase
 import crud
-from constants import critique_system_message
+from constants import critique_system_message, emp_info, summary_system_message
 
 from os import environ as env
 # from models import SecretDm
@@ -50,26 +52,42 @@ class RagDevil(DevilBase):
         self.__client = ChatOpenAI(
             api_key=openai_api_key,
             model="gpt-4o",
-            temperature=0.7,
-            max_tokens=256
-            )
+            temperature=1.1,
+            max_tokens=256,
+            model_kwargs={
+                "frequency_penalty": 0.7,
+            }
+        )
+        self.__summary_client = AsyncOpenAI(api_key=openai_api_key)
+        self.current_summary = ""
+        self.bert_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+
         self.history: Sequence[MessageLikeRepresentation] = []
         self.__system_prompt = critique_system_message
         self.__counter = 0
         self.enabled = True
         
 
-    def create_message_param(self):
+    def __create_critique_param(self):
+
+        _cur_summary = "[Target]\n" + self.current_summary + "\n"
+
         chat_history_string = "[대화 내역]\n"
 
         for msg in self.history:
             chat_history_string += msg.content + "\n"
 
+
         _messages = [
             SystemMessage(content=self.__system_prompt),
-            HumanMessage(content="{context}"),
-            HumanMessage(content=chat_history_string)
+            HumanMessage(content=_cur_summary), # 여론
+            HumanMessage(content=emp_info), # 직원정보
+            HumanMessage(content="{context}"),  # Secret DM
+            HumanMessage(content=chat_history_string),  # Chat History
+            HumanMessage(content="2-3문장으로 짧게 답해")
         ]
+
+
 
         return _messages
 
@@ -98,9 +116,11 @@ class RagDevil(DevilBase):
     def __mark_as_used(self, ids: List[int]):
         crud.mark_dm_as_used(db=next(get_db()), ids=ids)
 
-    async def __get_rag_chain(self):
+    async def __get_critique_chain(self):
 
-        _messages = self.create_message_param()
+        await self.__update_summary()
+
+        _messages = self.__create_critique_param()
         print(_messages)
         prompt = ChatPromptTemplate.from_messages(_messages)
 
@@ -129,35 +149,107 @@ class RagDevil(DevilBase):
 
         return rag_chain
 
+    # Stream
 
-    ## Stream
-    @override
-    async def __get_stream(self):
-        rag_chain = await self.__get_rag_chain()
-        stream = rag_chain.astream("")
+    # @override
+    # async def __get_stream(self):
+    #     rag_chain = await self.__get_critique_chain()
+    #     stream = rag_chain.astream("")
 
-        return stream
+    #     return stream
 
-    @override
-    async def get_streamed_content(self, streamHandler: Callable[[str, bool], None],
-                                   completionHandler: Callable[[str], None]):
-        stream = await self.__get_stream()
-        completion_buffer = ""
+    # @override
+    # async def get_streamed_content(self, streamHandler: Callable[[str, bool], None],
+    #                                completionHandler: Callable[[str], None]):
+    #     stream = await self.__get_stream()
+    #     completion_buffer = ""
 
-        isFirstChunk = True
+    #     isFirstChunk = True
 
-        async for chunk in stream:
-            chunk_content = chunk
-            if chunk_content is not None:
+    #     async for chunk in stream:
+    #         chunk_content = chunk
+    #         if chunk_content is not None:
 
-                completion_buffer += chunk_content
-                await streamHandler(completion_buffer, isFirstChunk)
+    #             completion_buffer += chunk_content
+    #             await streamHandler(completion_buffer, isFirstChunk)
 
-                if isFirstChunk:
-                    isFirstChunk = False
+    #             if isFirstChunk:
+    #                 isFirstChunk = False
 
-        self.__add_history(AIMessage(content=completion_buffer))
-        completionHandler(completion_buffer)
+    #     self.__add_history(AIMessage(content=completion_buffer))
+    #     completionHandler(completion_buffer)
+
+    def compare_with_prev_answers(self, target_sentence, candidate_sentences):
+        # Encode the target sentence once
+        target_embedding = self.bert_model.encode(target_sentence, convert_to_tensor=True)
+        # Encode all candidate sentences
+        candidate_embeddings = self.bert_model.encode(candidate_sentences, convert_to_tensor=True)
+        # Compute cosine similarity between the target and each candidate sentence
+        cosine_scores = util.pytorch_cos_sim(target_embedding, candidate_embeddings)
+        # Convert tensor to list of similarity scores
+        similarity_scores = cosine_scores.squeeze().tolist()
+        return similarity_scores
+
+    async def get_critique(self):
+
+        # summary
+        # summary = await self.__get_summary()
+
+        rag_chain = await self.__get_critique_chain()
+        completion = await rag_chain.ainvoke("")
+
+        print(completion)
+
+        # Check Duplicate
+        prev_ai_messeges = list(filter(lambda x: type(x) is AIMessage, self.history))
+        prev_ai_str_messages = list(map(lambda x: x.content, prev_ai_messeges))
+        print("prev ai!!")
+        print(prev_ai_str_messages)
+        if len(prev_ai_messeges) >= 1:
+            scores = self.compare_with_prev_answers(completion, prev_ai_str_messages)
+
+            for idx, score in enumerate(scores):
+                if score > 0.8:
+                    print("duplicate!!!")
+                    print(prev_ai_messeges[idx])
+                    return None
+
+
+        self.__add_history(AIMessage(content=completion))
+        return completion
+
+
+    def __create_summary_param(self):
+
+        chat_history_string = "[대화 내역]\n"
+
+        for msg in self.history:
+            chat_history_string += msg.content + "\n"
+
+        br = "\n"
+        return [
+            {"role": "system", "content": summary_system_message},
+            {"role": "user", "content": f"""
+            {chat_history_string}
+        """},
+        ]
+
+    async def __update_summary(self):
+        res = await self.__summary_client.chat.completions.create(
+            model="gpt-4o",
+            messages=self.__create_summary_param(),
+            stream=False,
+            max_tokens=256,
+            temperature=0.3
+        )
+
+        summary = res.choices[0].message.content
+
+        print(summary)
+        self.current_summary = summary
+        
+        return summary
+
 
     @override
     def __add_history(self, chat: MessageLikeRepresentation):

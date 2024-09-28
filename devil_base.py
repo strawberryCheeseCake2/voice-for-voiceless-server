@@ -7,9 +7,9 @@ from langchain_core.prompts.chat import MessageLikeRepresentation
 
 class DevilBase(metaclass=ABCMeta):
 
-  @abstractmethod
-  async def get_streamed_content(self, streamHandler: Callable, completionHandler: Callable):
-        pass
+  # @abstractmethod
+  # async def get_streamed_content(self, streamHandler: Callable, completionHandler: Callable):
+  #       pass
 
   @abstractmethod
   def add_user_message(self, sender: str, message: str):

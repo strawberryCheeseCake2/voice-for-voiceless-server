@@ -70,28 +70,43 @@ async def websocket_endpoint(
 
             devil.add_user_message(sender=message.sender,
                                    message=message.content)
-            if devil.is_enabled() and (devil.get_counter() >= 2 * len(connection_manager.active_connections)):
+            if devil.is_enabled() and (devil.get_counter() >= 5 * len(connection_manager.active_connections)):
 
-                async def handle_stream(streamed_content: str, isFirstToken: bool = False):
-                    devil_message = schemas.WSMessageCreate(
-                        content=streamed_content,
-                        sender=constants.devil_name,
-                        sentTime=current_time,
-                        isStream=True,
-                        isFirstToken=isFirstToken
-                    )
-                    await connection_manager.broadcast(devil_message.model_dump_json())
+                # async def handle_stream(streamed_content: str, isFirstToken: bool = False):
+                #     devil_message = schemas.WSMessageCreate(
+                #         content=streamed_content,
+                #         sender=constants.devil_name,
+                #         sentTime=current_time,
+                #         isStream=True,
+                #         isFirstToken=isFirstToken
+                #     )
+                #     await connection_manager.broadcast(devil_message.model_dump_json())
 
-                def handle_stream_complete(completion: str):
-                    completed_message = schemas.WSMessageCreate(
+                # def handle_stream_complete(completion: str):
+                #     completed_message = schemas.WSMessageCreate(
+                #         content=completion,
+                #         sender=constants.devil_name,
+                #         sentTime=current_time,
+                #     )
+                #     crud.log_message(db=db, message=completed_message)
+
+                # await devil.get_streamed_content(streamHandler=handle_stream,
+                #                                  completionHandler=handle_stream_complete)
+
+
+                completion = await devil.get_critique()
+
+                if completion is not None:
+                    db_message = schemas.WSMessageCreate(
                         content=completion,
                         sender=constants.devil_name,
-                        sentTime=current_time,
+                        sentTime=current_time
                     )
-                    crud.log_message(db=db, message=completed_message)
 
-                await devil.get_streamed_content(streamHandler=handle_stream,
-                                                 completionHandler=handle_stream_complete)
+                    await connection_manager.broadcast(db_message.model_dump_json())
+
+                    crud.log_message(db=db, message=db_message)
+
 
                 devil.reset_counter()
 
