@@ -39,7 +39,7 @@ openai_api_key = env['openai_api_key']
 
 """
 I think Development of the AI should be regulated. AI is taking away jobs and people are getting fired
-
+ bert
 I agree
 
 
@@ -149,37 +149,7 @@ class RagDevil(DevilBase):
 
         return rag_chain
 
-    # Stream
-
-    # @override
-    # async def __get_stream(self):
-    #     rag_chain = await self.__get_critique_chain()
-    #     stream = rag_chain.astream("")
-
-    #     return stream
-
-    # @override
-    # async def get_streamed_content(self, streamHandler: Callable[[str, bool], None],
-    #                                completionHandler: Callable[[str], None]):
-    #     stream = await self.__get_stream()
-    #     completion_buffer = ""
-
-    #     isFirstChunk = True
-
-    #     async for chunk in stream:
-    #         chunk_content = chunk
-    #         if chunk_content is not None:
-
-    #             completion_buffer += chunk_content
-    #             await streamHandler(completion_buffer, isFirstChunk)
-
-    #             if isFirstChunk:
-    #                 isFirstChunk = False
-
-    #     self.__add_history(AIMessage(content=completion_buffer))
-    #     completionHandler(completion_buffer)
-
-    def compare_with_prev_answers(self, target_sentence, candidate_sentences):
+    def calculate_completion_similarity(self, target_sentence, candidate_sentences):
         # Encode the target sentence once
         target_embedding = self.bert_model.encode(target_sentence, convert_to_tensor=True)
         # Encode all candidate sentences
@@ -190,27 +160,21 @@ class RagDevil(DevilBase):
         similarity_scores = cosine_scores.squeeze().tolist()
         return similarity_scores
 
+
     async def get_critique(self):
-
-        # summary
-        # summary = await self.__get_summary()
-
         rag_chain = await self.__get_critique_chain()
         completion = await rag_chain.ainvoke("")
 
-        print(completion)
 
         # Check Duplicate
         prev_ai_messeges = list(filter(lambda x: type(x) is AIMessage, self.history))
         prev_ai_str_messages = list(map(lambda x: x.content, prev_ai_messeges))
-        print("prev ai!!")
-        print(prev_ai_str_messages)
-        if len(prev_ai_messeges) >= 1:
-            scores = self.compare_with_prev_answers(completion, prev_ai_str_messages)
+
+        if len(prev_ai_messeges) >= 2:
+            scores = self.calculate_completion_similarity(completion, prev_ai_str_messages)
 
             for idx, score in enumerate(scores):
                 if score > 0.8:
-                    print("duplicate!!!")
                     print(prev_ai_messeges[idx])
                     return None
 
@@ -249,6 +213,26 @@ class RagDevil(DevilBase):
         self.current_summary = summary
         
         return summary
+
+    async def remove_used_dm(self, ai_completion: str):
+        # Calculate similarity between AI Answer and Secret DM
+        # Delete Secret Dm if similar 
+
+        dms = crud.get_unused_secret_dms(db=next(get_db()))
+        dms_str_list = list(map(lambda x: x.content, dms))
+
+        res = self.calculate_completion_similarity(ai_completion, dms_str_list)
+        if len(res) <= 1:
+            res = [res]
+
+        similar_dm_list = []
+        threshold = 0.8
+        for idx, sim in enumerate(res):
+            if sim > threshold:
+                similar_dm_list.append(dms[idx].id)
+        print(similar_dm_list)
+
+        self.__mark_as_used(similar_dm_list)
 
 
     @override
