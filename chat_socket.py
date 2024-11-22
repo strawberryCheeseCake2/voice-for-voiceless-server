@@ -71,7 +71,7 @@ async def websocket_endpoint(
             devil.add_user_message(sender=message.sender,
                                    message=message.content)
             if devil.is_enabled() and (devil.get_counter() >= 5 * len(connection_manager.active_connections)):
-             
+                print("CA Triggered!!!")
                 asyncio.create_task(generate_counterarg(devil=devil, db=db))
                 devil.reset_counter()
 

@@ -60,7 +60,7 @@ class RagDevil(DevilBase):
         )
         self.__summary_client = AsyncOpenAI(api_key=openai_api_key)
         self.current_summary = ""
-        self.bert_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+        self.bert_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", device="cuda")
 
         self.history: Sequence[MessageLikeRepresentation] = []
         self.__system_prompt = critique_system_message
@@ -86,6 +86,12 @@ class RagDevil(DevilBase):
             HumanMessage(content=chat_history_string),  # Chat History
             HumanMessage(content="2-3문장으로 짧게 답해")
         ]
+
+        #TODO: Remove
+        print("Critique Param Created, Used Info:")
+        print("1. sys_prompt, 2.emp_info")
+        print(f"3. current chat history summary: {_cur_summary}")
+        print(f"4.chat history (last chat of history={self.history[-1]})")
 
 
 
@@ -121,13 +127,16 @@ class RagDevil(DevilBase):
         await self.__update_summary()
 
         _messages = self.__create_critique_param()
-        print(_messages)
+        # print(_messages)
         prompt = ChatPromptTemplate.from_messages(_messages)
 
         docs, ids = self.__get_opposing_opinions()
         # self.__mark_as_used(ids=ids) # For Condition A
 
+        print("---------------------------------")
+        print("5.Secret DM used in this request:")
         print(docs)
+        print("-----------------------------------")
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200)
         splits = text_splitter.split_documents(docs)
@@ -151,9 +160,9 @@ class RagDevil(DevilBase):
 
     def calculate_completion_similarity(self, target_sentence, candidate_sentences):
         # Encode the target sentence once
-        target_embedding = self.bert_model.encode(target_sentence, convert_to_tensor=True)
+        target_embedding = self.bert_model.encode(target_sentence, convert_to_tensor=True).cuda()
         # Encode all candidate sentences
-        candidate_embeddings = self.bert_model.encode(candidate_sentences, convert_to_tensor=True)
+        candidate_embeddings = self.bert_model.encode(candidate_sentences, convert_to_tensor=True).cuda()
         # Compute cosine similarity between the target and each candidate sentence
         cosine_scores = util.pytorch_cos_sim(target_embedding, candidate_embeddings)
         # Convert tensor to list of similarity scores
@@ -169,8 +178,15 @@ class RagDevil(DevilBase):
         # Check Duplicate
         prev_ai_messeges = list(filter(lambda x: type(x) is AIMessage, self.history))
         prev_ai_str_messages = list(map(lambda x: x.content, prev_ai_messeges))
-
+        print("AI MESSGAE")
+        print(prev_ai_messeges)
+        print("AI MESSAGE_STRING")
+        print(prev_ai_str_messages)
+        
         if len(prev_ai_messeges) >= 2:
+            print("Content")
+            print(prev_ai_messeges[0].content)
+            print(prev_ai_messeges[1].content)
             scores = self.calculate_completion_similarity(completion, prev_ai_str_messages)
 
             for idx, score in enumerate(scores):
@@ -221,17 +237,22 @@ class RagDevil(DevilBase):
         dms = crud.get_unused_secret_dms(db=next(get_db()))
         dms_str_list = list(map(lambda x: x.content, dms))
 
+        if len(dms_str_list) <= 0:
+            return
         res = self.calculate_completion_similarity(ai_completion, dms_str_list)
-        if len(res) <= 1:
+        if len(res) <= 1 or type(res) is float:
             res = [res]
 
         similar_dm_list = []
-        threshold = 0.8
+        threshold = 0.5
+        print("------------------------")
+        print("Remove Duplicate DM START")
         for idx, sim in enumerate(res):
             if sim > threshold:
                 similar_dm_list.append(dms[idx].id)
+        print("Similar DM LIST START, they will be removed")
         print(similar_dm_list)
-
+        print("--------------------")
         self.__mark_as_used(similar_dm_list)
 
 
