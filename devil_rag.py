@@ -1,3 +1,5 @@
+import json
+
 from openai import AsyncOpenAI
 from typing import Optional, List, Callable, override, Sequence
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
@@ -27,7 +29,7 @@ from database import get_db
 import dotenv
 from devil_base import DevilBase
 import crud
-from constants import critique_system_message, emp_info, summary_system_message
+from constants import critique_system_message1, critique_system_message2, emp_info1, emp_info2, summary_system_message, duplicate_check_system_message
 
 from os import environ as env
 # from models import SecretDm
@@ -58,16 +60,17 @@ class RagDevil(DevilBase):
                 "frequency_penalty": 0.7,
             }
         )
-        self.__summary_client = AsyncOpenAI(api_key=openai_api_key)
+        self.__secondary_client = AsyncOpenAI(api_key=openai_api_key)
         self.current_summary = ""
         self.bert_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", device="cuda")
 
         self.history: Sequence[MessageLikeRepresentation] = []
-        self.__system_prompt = critique_system_message
+        self.__system_prompt = critique_system_message1
         self.__counter = 0
         self.enabled = True
+        self.task_num = 1
         
-
+    # Generate Counterargument
     def __create_critique_param(self):
 
         _cur_summary = "[Target]\n" + self.current_summary + "\n"
@@ -81,12 +84,12 @@ class RagDevil(DevilBase):
         _messages = [
             SystemMessage(content=self.__system_prompt),
             HumanMessage(content=_cur_summary), # 여론
-            HumanMessage(content=emp_info), # 직원정보
+            HumanMessage(content=emp_info1 if self.task_num == 1 else emp_info2), # 직원정보
             HumanMessage(content="{context}"),  # Secret DM
             HumanMessage(content=chat_history_string),  # Chat History
             HumanMessage(content="2-3문장으로 짧게 답해")
         ]
-
+        
         #TODO: Remove
         print("Critique Param Created, Used Info:")
         print("1. sys_prompt, 2.emp_info")
@@ -96,7 +99,8 @@ class RagDevil(DevilBase):
 
 
         return _messages
-
+    
+    # Callating Secret DM
     def __get_opposing_opinions(self):
         """
         For Condition B, C, used Field aims to remove dms used in first round experiment
@@ -215,7 +219,7 @@ class RagDevil(DevilBase):
         ]
 
     async def __update_summary(self):
-        res = await self.__summary_client.chat.completions.create(
+        res = await self.__secondary_client.chat.completions.create(
             model="gpt-4o",
             messages=self.__create_summary_param(),
             stream=False,
@@ -229,31 +233,63 @@ class RagDevil(DevilBase):
         self.current_summary = summary
         
         return summary
+    
+    def __create_dup_check_param(self, target: str, dm_str: str):
+
+        query_msg = f"""[Target]
+        {target}
+
+        [귓속말]
+        {dm_str}
+        """
+
+        br = "\n"
+        return [
+            {"role": "system", "content": duplicate_check_system_message},
+            {"role": "user", "content": query_msg},
+        ]
+
+    async def __check_dup_with_llm(self, target: str, dm_str: str):
+        res = await self.__secondary_client.chat.completions.create(
+            model="gpt-4o",
+            messages=self.__create_dup_check_param(target=target, dm_str=dm_str),
+            max_tokens=256,
+            temperature=0.3,
+            response_format={ "type": "json_object" }
+        )
+
+        res_str = res.choices[0].message.content
+        print(res_str)
+        res_obj = json.loads(res_str)
+
+        ids: List[int] = res_obj["ids"]
+        
+        return ids
 
     async def remove_used_dm(self, ai_completion: str):
         # Calculate similarity between AI Answer and Secret DM
         # Delete Secret Dm if similar 
 
+        # Process DM Objects into string
         dms = crud.get_unused_secret_dms(db=next(get_db()))
-        dms_str_list = list(map(lambda x: x.content, dms))
 
-        if len(dms_str_list) <= 0:
+        if len(dms) <= 0:
             return
-        res = self.calculate_completion_similarity(ai_completion, dms_str_list)
-        if len(res) <= 1 or type(res) is float:
-            res = [res]
+        
+        dms_str = ""
+        print("Remove Used DM Invoked")
+        print("Candidates:")
+        for dm in dms:
+            print(f"{dm.id}, {dm.content}")
+            dms_str += f"id: {dm.id}, content: {dm.content}\n"
 
-        similar_dm_list = []
-        threshold = 0.5
-        print("------------------------")
-        print("Remove Duplicate DM START")
-        for idx, sim in enumerate(res):
-            if sim > threshold:
-                similar_dm_list.append(dms[idx].id)
-        print("Similar DM LIST START, they will be removed")
-        print(similar_dm_list)
-        print("--------------------")
-        self.__mark_as_used(similar_dm_list)
+        # Feed DM string into LLM & Get Duplicate message ids
+        dup_ids = await self.__check_dup_with_llm(target=ai_completion, dm_str=dms_str)
+        print(dup_ids)
+
+        # Mark duplicate ids as used
+        self.__mark_as_used(dup_ids)
+
 
 
     @override
@@ -280,6 +316,8 @@ class RagDevil(DevilBase):
         self.__counter += 1
 
     # For admin
+
+
     @override
     def get_history(self):
         return self.history
@@ -294,6 +332,19 @@ class RagDevil(DevilBase):
 
     def get_system_prompt(self):
         return self.__system_prompt
+    
+
+    @override
+    def set_task_num(self, num: int):
+        self.task_num = num
+        
+        if num == 1:
+            self.set_system_prompt(content=critique_system_message1)
+        else:
+            self.set_system_prompt(content=critique_system_message2)
+
+    def get_task_num(self):
+        return self.task_num
 
     def enable(self, enabled: bool):
         self.enabled = enabled
