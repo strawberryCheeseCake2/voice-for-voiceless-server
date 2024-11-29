@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+from pytz import timezone
 
 from openai import AsyncOpenAI
 from typing import Optional, List, Callable, override, Sequence
@@ -188,13 +190,28 @@ class RagDevil(DevilBase):
         print(prev_ai_str_messages)
         
         if len(prev_ai_messeges) >= 2:
-            print("Content")
-            print(prev_ai_messeges[0].content)
-            print(prev_ai_messeges[1].content)
             scores = self.calculate_completion_similarity(completion, prev_ai_str_messages)
 
             for idx, score in enumerate(scores):
                 if score > 0.8:
+
+                    # Log duplicate ai answers
+                    str_to_log = f"""
+                    [completion]
+                    {completion}
+                    [dup_prev_message]
+                    {prev_ai_messeges[idx]}
+                    [cos_sim]
+                    {score}
+                    """
+
+                    log = schemas.WSMessageCreate(
+                        content=str_to_log,
+                        sender="AI_DUP_LOG",
+                        sentTime=datetime.now(
+                            timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M:%S")
+                    )           
+                    crud.log_message(db=next(get_db()), message=log)
                     print(prev_ai_messeges[idx])
                     return None
 
@@ -231,6 +248,18 @@ class RagDevil(DevilBase):
 
         print(summary)
         self.current_summary = summary
+
+        # Log Summary
+
+        log = schemas.WSMessageCreate(
+            content=summary,
+            sender="SUMMARY_LOG",
+            sentTime=datetime.now(
+                timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+        crud.log_message(db=next(get_db()), message=log)
+        
         
         return summary
     
@@ -289,6 +318,24 @@ class RagDevil(DevilBase):
 
         # Mark duplicate ids as used
         self.__mark_as_used(dup_ids)
+
+        if len(dup_ids) >= 2:
+            # Log Removal of dm
+            str_to_log = f"""
+            [ai_completion]
+            {ai_completion}
+            [dup_ids]
+            {dup_ids}
+            """
+
+            log = schemas.WSMessageCreate(
+                content=str_to_log,
+                sender="DM_REMOVAL_LOG",
+                sentTime=datetime.now(
+                    timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M:%S")
+            )
+
+            crud.log_message(db=next(get_db()), message=log)
 
 
 
