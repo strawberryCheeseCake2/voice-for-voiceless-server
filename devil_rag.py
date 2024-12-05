@@ -241,7 +241,7 @@ class RagDevil(DevilBase):
             messages=self.__create_summary_param(),
             stream=False,
             max_tokens=256,
-            temperature=0.3
+            temperature=0.8
         )
 
         summary = res.choices[0].message.content
@@ -319,7 +319,7 @@ class RagDevil(DevilBase):
         # Mark duplicate ids as used
         self.__mark_as_used(dup_ids)
 
-        if len(dup_ids) >= 2:
+        if len(dup_ids) >= 1:
             # Log Removal of dm
             str_to_log = f"""
             [ai_completion]
