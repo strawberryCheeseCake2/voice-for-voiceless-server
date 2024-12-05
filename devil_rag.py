@@ -31,7 +31,9 @@ from database import get_db
 import dotenv
 from devil_base import DevilBase
 import crud
-from constants import critique_system_message1, critique_system_message2, emp_info1, emp_info2, summary_system_message, duplicate_check_system_message
+from constants import critique_system_message1_paraphrase, critique_system_message1_da, \
+    critique_system_message2_paraphrase, critique_system_message2_da, \
+    emp_info1, emp_info2, summary_system_message, duplicate_check_system_message
 
 from os import environ as env
 # from models import SecretDm
@@ -67,30 +69,38 @@ class RagDevil(DevilBase):
         self.bert_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", device="cuda")
 
         self.history: Sequence[MessageLikeRepresentation] = []
-        self.__system_prompt = critique_system_message1
+        # self.__system_prompt = critique_system_message1
         self.__counter = 0
         self.enabled = True
         self.task_num = 1
         
-    # Generate Counterargument
-    def __create_critique_param(self):
+    # Generate Counterargument or Paraphrased Message
+    def __create_critique_param(self, paraphrase: bool = False):
 
         _cur_summary = "[Target]\n" + self.current_summary + "\n"
 
-        chat_history_string = "[대화 내역]\n"
 
         for msg in self.history:
             chat_history_string += msg.content + "\n"
 
+        _messages = []
 
-        _messages = [
-            SystemMessage(content=self.__system_prompt),
-            HumanMessage(content=_cur_summary), # 여론
-            HumanMessage(content=emp_info1 if self.task_num == 1 else emp_info2), # 직원정보
-            HumanMessage(content="{context}"),  # Secret DM
-            HumanMessage(content=chat_history_string),  # Chat History
-            HumanMessage(content="2-3문장으로 짧게 답해")
-        ]
+        if paraphrase: # Paraphrase Mode
+            _sys_prompt = critique_system_message1_paraphrase if self.task_num == 1 else critique_system_message2_paraphrase
+            _messages = [
+                SystemMessage(content=_sys_prompt),
+                HumanMessage(content="{context}"),  # Secret DM
+                HumanMessage(content="2-3문장으로 짧게 답해")
+            ]
+            
+        else: # DA(Counterargument) Mode
+            _sys_prompt = critique_system_message1_da if self.task_num == 1 else critique_system_message2_da
+            _messages = [
+                SystemMessage(content=_sys_prompt),
+                HumanMessage(content=_cur_summary), # [Target] (여론)
+                HumanMessage(content=emp_info1 if self.task_num == 1 else emp_info2), # [직원 리스트]
+                HumanMessage(content="2-3문장으로 짧게 답해")
+            ]
         
         #TODO: Remove
         print("Critique Param Created, Used Info:")
@@ -129,12 +139,8 @@ class RagDevil(DevilBase):
         crud.mark_dm_as_used(db=next(get_db()), ids=ids)
 
     async def __get_critique_chain(self):
-
+        paraphrase = False
         await self.__update_summary()
-
-        _messages = self.__create_critique_param()
-        # print(_messages)
-        prompt = ChatPromptTemplate.from_messages(_messages)
 
         docs, ids = self.__get_opposing_opinions()
         # self.__mark_as_used(ids=ids) # For Condition A
@@ -143,6 +149,15 @@ class RagDevil(DevilBase):
         print("5.Secret DM used in this request:")
         print(docs)
         print("-----------------------------------")
+
+        if len(docs) >= 1:
+            paraphrase = True
+
+        _messages = self.__create_critique_param(paraphrase=paraphrase)
+        prompt = ChatPromptTemplate.from_messages(_messages)
+
+
+
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200)
         splits = text_splitter.split_documents(docs)
@@ -156,11 +171,21 @@ class RagDevil(DevilBase):
             return "\n\n".join(doc.page_content for doc in docs)
 
         rag_chain: RunnableSerializable = (
-            {"context": retriever | format_docs}
-            | prompt
+            prompt
             | self.__client
             | StrOutputParser()
         )
+
+        if paraphrase:
+            rag_chain: RunnableSerializable = (
+                {"context": retriever | format_docs}
+                | prompt
+                | self.__client
+                | StrOutputParser()
+            )
+            print("paraphrase mode")
+        else:
+            print("da mode")
 
         return rag_chain
 
@@ -240,7 +265,7 @@ class RagDevil(DevilBase):
             model="gpt-4o",
             messages=self.__create_summary_param(),
             stream=False,
-            max_tokens=256,
+            max_tokens=512,
             temperature=0.8
         )
 
@@ -374,21 +399,21 @@ class RagDevil(DevilBase):
         self.history = []
         self.reset_counter()
 
-    def set_system_prompt(self, content: str):
-        self.__system_prompt = content
+    # def set_system_prompt(self, content: str):
+    #     self.__system_prompt = content
 
-    def get_system_prompt(self):
-        return self.__system_prompt
+    # def get_system_prompt(self):
+    #     return self.__system_prompt
     
 
     @override
     def set_task_num(self, num: int):
         self.task_num = num
         
-        if num == 1:
-            self.set_system_prompt(content=critique_system_message1)
-        else:
-            self.set_system_prompt(content=critique_system_message2)
+        # if num == 1:
+        #     self.set_system_prompt(content=critique_system_message1)
+        # else:
+        #     self.set_system_prompt(content=critique_system_message2)
 
     def get_task_num(self):
         return self.task_num
