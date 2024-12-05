@@ -75,26 +75,40 @@ class RagDevil(DevilBase):
         self.task_num = 1
         
     # Generate Counterargument or Paraphrased Message
-    def __create_critique_param(self, paraphrase: bool = False):
+    async def __create_critique_param(self):
 
-        _cur_summary = "[Target]\n" + self.current_summary + "\n"
+        paraphrase = False
 
+        opinion_str, ids = self.__get_opposing_opinions()
+        # self.__mark_as_used(ids=ids) # For Condition A
 
-        for msg in self.history:
-            chat_history_string += msg.content + "\n"
+        print("---------------------------------")
+        print("!Secret DM used in this request:")
+        print(opinion_str)
+        print("-----------------------------------")
+
+        if len(ids) >= 1:
+            paraphrase = True
+            print("switch to paraphrase mode")
+
 
         _messages = []
 
         if paraphrase: # Paraphrase Mode
             _sys_prompt = critique_system_message1_paraphrase if self.task_num == 1 else critique_system_message2_paraphrase
+            
             _messages = [
                 SystemMessage(content=_sys_prompt),
-                HumanMessage(content="{context}"),  # Secret DM
+                HumanMessage(content=opinion_str),  # Secret DM
                 HumanMessage(content="2-3문장으로 짧게 답해")
             ]
             
         else: # DA(Counterargument) Mode
             _sys_prompt = critique_system_message1_da if self.task_num == 1 else critique_system_message2_da
+            
+            await self.__update_summary()
+            _cur_summary = "[Target]\n" + self.current_summary + "\n"
+
             _messages = [
                 SystemMessage(content=_sys_prompt),
                 HumanMessage(content=_cur_summary), # [Target] (여론)
@@ -102,13 +116,6 @@ class RagDevil(DevilBase):
                 HumanMessage(content="2-3문장으로 짧게 답해")
             ]
         
-        #TODO: Remove
-        print("Critique Param Created, Used Info:")
-        print("1. sys_prompt, 2.emp_info")
-        print(f"3. current chat history summary: {_cur_summary}")
-        print(f"4.chat history (last chat of history={self.history[-1]})")
-
-
 
         return _messages
     
@@ -131,63 +138,13 @@ class RagDevil(DevilBase):
         if len(dms) <= 0:
             opinions += "Empty"
 
-        opinion_docs = [Document(page_content=opinions)]
+        # opinion_docs = [Document(page_content=opinions)]
 
-        return opinion_docs, ids
+        return opinions, ids
 
     def __mark_as_used(self, ids: List[int]):
         crud.mark_dm_as_used(db=next(get_db()), ids=ids)
 
-    async def __get_critique_chain(self):
-        paraphrase = False
-        await self.__update_summary()
-
-        docs, ids = self.__get_opposing_opinions()
-        # self.__mark_as_used(ids=ids) # For Condition A
-
-        print("---------------------------------")
-        print("5.Secret DM used in this request:")
-        print(docs)
-        print("-----------------------------------")
-
-        if len(docs) >= 1:
-            paraphrase = True
-
-        _messages = self.__create_critique_param(paraphrase=paraphrase)
-        prompt = ChatPromptTemplate.from_messages(_messages)
-
-
-
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=200)
-        splits = text_splitter.split_documents(docs)
-        vectorstore = await Chroma.afrom_documents(
-            documents=splits, embedding=OpenAIEmbeddings(openai_api_key=openai_api_key))
-
-        # Retrieve and generate using the relevant snippets of the blog.
-        retriever = vectorstore.as_retriever()
-
-        def format_docs(docs):
-            return "\n\n".join(doc.page_content for doc in docs)
-
-        rag_chain: RunnableSerializable = (
-            prompt
-            | self.__client
-            | StrOutputParser()
-        )
-
-        if paraphrase:
-            rag_chain: RunnableSerializable = (
-                {"context": retriever | format_docs}
-                | prompt
-                | self.__client
-                | StrOutputParser()
-            )
-            print("paraphrase mode")
-        else:
-            print("da mode")
-
-        return rag_chain
 
     def calculate_completion_similarity(self, target_sentence, candidate_sentences):
         # Encode the target sentence once
@@ -202,8 +159,12 @@ class RagDevil(DevilBase):
 
 
     async def get_critique(self):
-        rag_chain = await self.__get_critique_chain()
-        completion = await rag_chain.ainvoke("")
+        messages = await self.__create_critique_param()
+        
+        print(messages)
+        res = await self.__client.ainvoke(messages)
+        completion = res.content
+        print(completion)
 
 
         # Check Duplicate
