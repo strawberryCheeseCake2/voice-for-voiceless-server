@@ -117,7 +117,7 @@ class RagDevil(DevilBase):
             ]
         
 
-        return _messages
+        return _messages, paraphrase
     
     # Callating Secret DM
     def __get_opposing_opinions(self):
@@ -159,7 +159,7 @@ class RagDevil(DevilBase):
 
 
     async def get_critique(self):
-        messages = await self.__create_critique_param()
+        messages, paraphrase = await self.__create_critique_param()
         
         print(messages)
         res = await self.__client.ainvoke(messages)
@@ -175,7 +175,7 @@ class RagDevil(DevilBase):
         print("AI MESSAGE_STRING")
         print(prev_ai_str_messages)
         
-        if len(prev_ai_messeges) >= 2:
+        if len(prev_ai_messeges) >= 2 and not paraphrase:
             scores = self.calculate_completion_similarity(completion, prev_ai_str_messages)
 
             for idx, score in enumerate(scores):
